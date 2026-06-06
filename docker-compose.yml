@@ -1,0 +1,6 @@
+services:
+  autosalon-app:
+    image: autosalon-backend-lab1:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
