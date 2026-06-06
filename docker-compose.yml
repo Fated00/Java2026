@@ -8,41 +8,102 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - ./src/main/resources/keycloak:/opt/keycloak/data/import:ro
+      - ./order-service/src/main/resources/keycloak:/opt/keycloak/data/import:ro
 
-  postgres:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: autosalon
+      RABBITMQ_DEFAULT_PASS: autosalon
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping && rabbitmq-diagnostics -q check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  order-postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: autosalon
+      POSTGRES_DB: autosalon_order
       POSTGRES_USER: autosalon
       POSTGRES_PASSWORD: autosalon
     ports:
       - "5435:5432"
     volumes:
-      - autosalon-postgres-data:/var/lib/postgresql/data
+      - autosalon-order-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U autosalon -d autosalon"]
+      test: ["CMD-SHELL", "pg_isready -U autosalon -d autosalon_order"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  autosalon-app:
-    image: autosalon-backend-lab1:latest
+  storage-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: autosalon_storage
+      POSTGRES_USER: autosalon
+      POSTGRES_PASSWORD: autosalon
+    ports:
+      - "5436:5432"
+    volumes:
+      - autosalon-storage-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autosalon -d autosalon_storage"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    image: autosalon-order-service:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: order-service/Dockerfile
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/autosalon
+      SPRING_DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/autosalon_order
       SPRING_DATASOURCE_USERNAME: autosalon
       SPRING_DATASOURCE_PASSWORD: autosalon
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: autosalon
+      SPRING_RABBITMQ_PASSWORD: autosalon
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/autosalon/protocol/openid-connect/certs
     ports:
       - "8080:8080"
     depends_on:
-      postgres:
+      order-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  storage-service:
+    image: autosalon-storage-service:latest
+    build:
+      context: .
+      dockerfile: storage-service/Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://storage-postgres:5432/autosalon_storage
+      SPRING_DATASOURCE_USERNAME: autosalon
+      SPRING_DATASOURCE_PASSWORD: autosalon
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: autosalon
+      SPRING_RABBITMQ_PASSWORD: autosalon
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/autosalon/protocol/openid-connect/certs
+    ports:
+      - "8082:8082"
+    depends_on:
+      storage-postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       keycloak:
         condition: service_started
 
 volumes:
-  autosalon-postgres-data:
+  autosalon-order-postgres-data:
+  autosalon-storage-postgres-data:

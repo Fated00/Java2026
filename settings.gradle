@@ -1,1 +1,3 @@
-rootProject.name = 'autosalon-backend-lab1'
+rootProject.name = 'autosalon-backend'
+
+include 'common', 'order-service', 'storage-service'
