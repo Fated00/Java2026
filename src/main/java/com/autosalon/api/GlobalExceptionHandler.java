@@ -6,6 +6,7 @@ import com.autosalon.domain.exception.EntityNotFoundException;
 import com.autosalon.domain.exception.IncompatibleComponentException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,7 +17,7 @@ import java.time.Instant;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
-public final class GlobalExceptionHandler {
+public class GlobalExceptionHandler {
     @ExceptionHandler(EntityNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiError handleNotFound(EntityNotFoundException exception) {
@@ -42,6 +43,12 @@ public final class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleUnreadable(HttpMessageNotReadableException exception) {
         return new ApiError("REQUEST_BODY_INVALID", exception.getMostSpecificCause().getMessage(), Instant.now());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiError handleAccessDenied(AccessDeniedException exception) {
+        return new ApiError("ACCESS_DENIED", exception.getMessage(), Instant.now());
     }
 
     private String formatFieldError(FieldError error) {

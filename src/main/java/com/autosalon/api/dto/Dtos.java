@@ -138,7 +138,7 @@ public final class Dtos {
     ) {
     }
 
-    public record CreateInStockOrderRequest(@NotNull UUID clientId, @NotNull UUID carId) {
+    public record CreateInStockOrderRequest(@NotNull UUID carId) {
     }
 
     public record InStockOrderDto(
@@ -152,7 +152,6 @@ public final class Dtos {
     }
 
     public record CreateCustomOrderRequest(
-            @NotNull UUID clientId,
             @NotNull UUID modelId,
             @NotEmpty Map<ComponentType, UUID> selectedOptionIds
     ) {
@@ -169,7 +168,6 @@ public final class Dtos {
     }
 
     public record CreateTestDriveRequest(
-            @NotNull UUID clientId,
             @NotNull UUID carId,
             @NotNull @Future LocalDateTime startsAt
     ) {

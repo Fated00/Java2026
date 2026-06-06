@@ -1,3 +1,3 @@
-# Autosalon Backend Lab 2
+# Autosalon Backend Lab 3
 
 Выполнил: Егор Погуляев М3310

@@ -1,4 +1,15 @@
 services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./src/main/resources/keycloak:/opt/keycloak/data/import:ro
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -24,11 +35,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/autosalon
       SPRING_DATASOURCE_USERNAME: autosalon
       SPRING_DATASOURCE_PASSWORD: autosalon
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/autosalon/protocol/openid-connect/certs
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_started
 
 volumes:
   autosalon-postgres-data:

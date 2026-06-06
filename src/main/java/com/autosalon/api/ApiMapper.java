@@ -26,7 +26,7 @@ import java.util.EnumMap;
 import java.util.Map;
 
 @Component
-public final class ApiMapper {
+public class ApiMapper {
     private final ModelMapper modelMapper;
 
     public ApiMapper(ModelMapper modelMapper) {

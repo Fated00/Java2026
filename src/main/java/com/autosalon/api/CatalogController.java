@@ -15,6 +15,7 @@ import com.autosalon.service.CarCatalogService;
 import com.autosalon.service.filter.CarFilter;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,7 +33,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/catalog")
-public final class CatalogController {
+public class CatalogController {
     private final CarCatalogService catalogService;
     private final ApiMapper mapper;
 
@@ -42,17 +43,20 @@ public final class CatalogController {
     }
 
     @GetMapping("/models")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public List<CarModelDto> listModels() {
         return catalogService.listModels().stream().map(mapper::toDto).toList();
     }
 
     @GetMapping("/models/{id}")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public CarModelDto getModel(@PathVariable UUID id) {
         return mapper.toDto(catalogService.findModel(id));
     }
 
     @PostMapping("/models")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('WAREHOUSE_ADMIN','ADMIN')")
     public CarModelDto createModel(@Valid @RequestBody CreateCarModelRequest request) {
         return mapper.toDto(catalogService.createModel(
                 request.brand(),
@@ -69,11 +73,13 @@ public final class CatalogController {
     }
 
     @GetMapping("/cars")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public List<CarDto> listCars() {
         return catalogService.listCars().stream().map(mapper::toDto).toList();
     }
 
     @GetMapping("/cars/available")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public List<CarDto> listAvailableCars(
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
@@ -111,34 +117,40 @@ public final class CatalogController {
     }
 
     @GetMapping("/cars/{id}")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public CarDto getCar(@PathVariable UUID id) {
         return mapper.toDto(catalogService.findCar(id));
     }
 
     @PostMapping("/cars")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('WAREHOUSE_ADMIN','ADMIN')")
     public CarDto createCar(@Valid @RequestBody CreateCarRequest request) {
         return mapper.toDto(catalogService.addCar(request.modelId(), request.color(), request.price()));
     }
 
     @PatchMapping("/cars/{id}")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_ADMIN','ADMIN')")
     public CarDto updateCar(@PathVariable UUID id, @Valid @RequestBody UpdateCarRequest request) {
         return mapper.toDto(catalogService.updateCar(id, request.color(), request.price(), request.available()));
     }
 
     @DeleteMapping("/cars/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('WAREHOUSE_ADMIN','ADMIN')")
     public void deleteCar(@PathVariable UUID id) {
         catalogService.deleteCar(id);
     }
 
     @GetMapping("/parts")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public List<PartDto> listParts() {
         return catalogService.listParts().stream().map(mapper::toDto).toList();
     }
 
     @PostMapping("/parts")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('WAREHOUSE_ADMIN','ADMIN')")
     public PartDto createPart(@Valid @RequestBody CreatePartRequest request) {
         return mapper.toDto(catalogService.addPart(
                 request.sku(),

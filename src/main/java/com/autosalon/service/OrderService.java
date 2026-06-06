@@ -13,6 +13,8 @@ import com.autosalon.repository.CarRepository;
 import com.autosalon.repository.CustomCarOrderRepository;
 import com.autosalon.repository.InStockCarOrderRepository;
 import com.autosalon.repository.UserRepository;
+import com.autosalon.security.CurrentUserService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,17 +31,20 @@ public class OrderService {
     private final CarRepository carRepository;
     private final InStockCarOrderRepository inStockOrderRepository;
     private final CustomCarOrderRepository customOrderRepository;
+    private final CurrentUserService currentUserService;
 
     public OrderService(
             UserRepository userRepository,
             CarRepository carRepository,
             InStockCarOrderRepository inStockOrderRepository,
-            CustomCarOrderRepository customOrderRepository
+            CustomCarOrderRepository customOrderRepository,
+            CurrentUserService currentUserService
     ) {
         this.userRepository = requireNonNull(userRepository, "user repository");
         this.carRepository = requireNonNull(carRepository, "car repository");
         this.inStockOrderRepository = requireNonNull(inStockOrderRepository, "in-stock order repository");
         this.customOrderRepository = requireNonNull(customOrderRepository, "custom order repository");
+        this.currentUserService = requireNonNull(currentUserService, "current user service");
     }
 
     public InStockCarOrder createInStockOrder(UUID clientId, UUID carId) {
@@ -62,31 +67,63 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("@orderSecurity.canReadInStockOrder(#id)")
     public InStockCarOrder findInStockOrder(UUID id) {
         return ServiceSupport.findActiveOrThrow(inStockOrderRepository, id, "InStockCarOrder");
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("@orderSecurity.canReadCustomOrder(#id)")
     public CustomCarOrder findCustomOrder(UUID id) {
         return ServiceSupport.findActiveOrThrow(customOrderRepository, id, "CustomCarOrder");
     }
 
     @Transactional(readOnly = true)
     public List<InStockCarOrder> listInStockOrders() {
-        return inStockOrderRepository.findByRemovedFalse();
+        List<InStockCarOrder> orders = inStockOrderRepository.findByRemovedFalse();
+        if (currentUserService.hasRole("USER") && !currentUserService.hasAnyRole("MANAGER", "ADMIN")) {
+            UUID currentUserId = currentUserService.currentAppUserId();
+            return orders.stream()
+                    .filter(order -> order.getClient().getId().equals(currentUserId))
+                    .toList();
+        }
+        return orders;
     }
 
     @Transactional(readOnly = true)
     public List<CustomCarOrder> listCustomOrders() {
-        return customOrderRepository.findByRemovedFalse();
+        List<CustomCarOrder> orders = customOrderRepository.findByRemovedFalse();
+        if (currentUserService.hasRole("USER") && !currentUserService.hasAnyRole("MANAGER", "ADMIN")) {
+            UUID currentUserId = currentUserService.currentAppUserId();
+            return orders.stream()
+                    .filter(order -> order.getClient().getId().equals(currentUserId))
+                    .toList();
+        }
+        return orders;
     }
 
+    @PreAuthorize("@orderSecurity.canCancelInStockOrder(#orderId)")
+    public InStockCarOrder cancelInStockOrder(UUID orderId) {
+        InStockCarOrder order = ServiceSupport.findActiveOrThrow(inStockOrderRepository, orderId, "InStockCarOrder");
+        order.setStatus(InStockOrderStatus.CANCELLED);
+        return inStockOrderRepository.save(order);
+    }
+
+    @PreAuthorize("@orderSecurity.canCancelCustomOrder(#orderId)")
+    public CustomCarOrder cancelCustomOrder(UUID orderId) {
+        CustomCarOrder order = ServiceSupport.findActiveOrThrow(customOrderRepository, orderId, "CustomCarOrder");
+        order.setStatus(CustomOrderStatus.CANCELLED);
+        return customOrderRepository.save(order);
+    }
+
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public InStockCarOrder updateInStockOrderStatus(UUID orderId, InStockOrderStatus status) {
         InStockCarOrder order = findInStockOrder(orderId);
         order.setStatus(status);
         return inStockOrderRepository.save(order);
     }
 
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public CustomCarOrder updateCustomOrderStatus(UUID orderId, CustomOrderStatus status) {
         CustomCarOrder order = findCustomOrder(orderId);
         order.setStatus(status);

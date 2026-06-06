@@ -1,0 +1,139 @@
+{
+  "realm": "autosalon",
+  "enabled": true,
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "USER" },
+      { "name": "MANAGER" },
+      { "name": "WAREHOUSE_ADMIN" },
+      { "name": "ADMIN" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "autosalon-api",
+      "name": "Autosalon API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "protocolMappers": [
+        {
+          "name": "app_user_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "app_user_id",
+            "claim.name": "app_user_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "egor.user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "egor",
+      "lastName": "poguliaev",
+      "email": "egor.user@example.com",
+      "attributes": {
+        "app_user_id": ["10000000-0000-0000-0000-000000000001"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER"]
+    },
+    {
+      "username": "egor.manager",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "egor",
+      "lastName": "poguliaev",
+      "email": "egor.manager@example.com",
+      "attributes": {
+        "app_user_id": ["10000000-0000-0000-0000-000000000002"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER", "MANAGER"]
+    },
+    {
+      "username": "egor.warehouse",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "egor",
+      "lastName": "poguliaev",
+      "email": "egor.warehouse@example.com",
+      "attributes": {
+        "app_user_id": ["10000000-0000-0000-0000-000000000003"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["WAREHOUSE_ADMIN"]
+    },
+    {
+      "username": "egor.other",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "egor",
+      "lastName": "poguliaev",
+      "email": "egor.other@example.com",
+      "attributes": {
+        "app_user_id": ["10000000-0000-0000-0000-000000000005"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER"]
+    },
+    {
+      "username": "egor.admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "egor",
+      "lastName": "poguliaev",
+      "email": "egor.admin@example.com",
+      "attributes": {
+        "app_user_id": ["10000000-0000-0000-0000-000000000004"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ADMIN"]
+    }
+  ]
+}

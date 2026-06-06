@@ -1,6 +1,6 @@
 spring:
   application:
-    name: autosalon-backend-lab2
+    name: autosalon-backend-lab3
   datasource:
     url: jdbc:postgresql://localhost:5435/autosalon
     username: autosalon
@@ -16,6 +16,11 @@ spring:
           time_zone: UTC
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.sql
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/realms/autosalon/protocol/openid-connect/certs
 
 springdoc:
   swagger-ui:

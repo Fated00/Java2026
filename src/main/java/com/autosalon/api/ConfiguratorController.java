@@ -10,6 +10,7 @@ import com.autosalon.domain.enums.ComponentType;
 import com.autosalon.service.ConfiguratorService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,7 +25,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/configurator")
-public final class ConfiguratorController {
+public class ConfiguratorController {
     private final ConfiguratorService configuratorService;
     private final ApiMapper mapper;
 
@@ -35,6 +36,7 @@ public final class ConfiguratorController {
 
     @PostMapping("/options")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('WAREHOUSE_ADMIN','ADMIN')")
     public ComponentOptionDto registerOption(@Valid @RequestBody RegisterComponentOptionRequest request) {
         return mapper.toDto(configuratorService.registerComponentOption(
                 request.type(),
@@ -45,11 +47,13 @@ public final class ConfiguratorController {
     }
 
     @GetMapping("/options")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public List<ComponentOptionDto> listOptionsForModel(@RequestParam UUID modelId, @RequestParam ComponentType type) {
         return configuratorService.listOptionsForModel(modelId, type).stream().map(mapper::toDto).toList();
     }
 
     @PostMapping("/base-components")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_ADMIN','ADMIN')")
     public CarModelDto assignBaseComponent(@Valid @RequestBody AssignBaseComponentRequest request) {
         return mapper.toDto(configuratorService.assignBaseComponent(
                 request.modelId(),
@@ -59,6 +63,7 @@ public final class ConfiguratorController {
     }
 
     @GetMapping("/base-configurations")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','WAREHOUSE_ADMIN','ADMIN')")
     public List<ConfigurationDto> listBaseConfigurations(
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) Set<ComponentType> componentTypes,
@@ -70,6 +75,7 @@ public final class ConfiguratorController {
     }
 
     @PostMapping("/configurations")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','ADMIN')")
     public ConfigurationDto buildConfiguration(@Valid @RequestBody BuildConfigurationRequest request) {
         return mapper.toDto(configuratorService.buildConfiguration(request.modelId(), request.selectedOptionIds()));
     }

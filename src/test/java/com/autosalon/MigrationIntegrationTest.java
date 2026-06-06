@@ -24,7 +24,7 @@ class MigrationIntegrationTest extends IntegrationTestBase {
         );
 
         assertThat(migrationCount).isGreaterThanOrEqualTo(2);
-        assertThat(userCount).isEqualTo(4);
+        assertThat(userCount).isEqualTo(5);
         assertThat(modelCount).isEqualTo(3);
         assertThat(baseComponentCount).isEqualTo(12);
     }
