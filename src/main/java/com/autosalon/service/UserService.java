@@ -2,17 +2,21 @@ package com.autosalon.service;
 
 import com.autosalon.domain.enums.Role;
 import com.autosalon.domain.model.User;
-import com.autosalon.repository.CrudRepository;
+import com.autosalon.repository.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
 import static com.autosalon.domain.validation.DomainValidator.requireNonNull;
 
-public final class UserService {
-    private final CrudRepository<User> userRepository;
+@Service
+@Transactional
+public class UserService {
+    private final UserRepository userRepository;
 
-    public UserService(CrudRepository<User> userRepository) {
+    public UserService(UserRepository userRepository) {
         this.userRepository = requireNonNull(userRepository, "user repository");
     }
 
@@ -20,25 +24,25 @@ public final class UserService {
         return userRepository.save(User.create(fullName, role));
     }
 
+    @Transactional(readOnly = true)
     public User findUser(UUID id) {
-        return ServiceSupport.findOrThrow(userRepository, id, "User");
+        return ServiceSupport.findActiveOrThrow(userRepository, id, "User");
     }
 
+    @Transactional(readOnly = true)
     public List<User> listUsers() {
-        return userRepository.findAll();
+        return userRepository.findByRemovedFalse();
     }
 
+    @Transactional(readOnly = true)
     public List<User> listUsersByRole(Role role) {
         requireNonNull(role, "role");
-        return userRepository.findAll().stream()
-                .filter(user -> user.getRole() == role)
-                .toList();
+        return userRepository.findByRoleAndRemovedFalse(role);
     }
 
     public void deleteUser(UUID id) {
-        if (!userRepository.existsById(id)) {
-            ServiceSupport.findOrThrow(userRepository, id, "User");
-        }
-        userRepository.deleteById(id);
+        User user = findUser(id);
+        user.markRemoved();
+        userRepository.save(user);
     }
 }

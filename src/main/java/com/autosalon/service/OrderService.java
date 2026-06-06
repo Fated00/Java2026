@@ -9,7 +9,12 @@ import com.autosalon.domain.model.Configuration;
 import com.autosalon.domain.model.CustomCarOrder;
 import com.autosalon.domain.model.InStockCarOrder;
 import com.autosalon.domain.model.User;
-import com.autosalon.repository.CrudRepository;
+import com.autosalon.repository.CarRepository;
+import com.autosalon.repository.CustomCarOrderRepository;
+import com.autosalon.repository.InStockCarOrderRepository;
+import com.autosalon.repository.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
@@ -17,17 +22,19 @@ import java.util.UUID;
 
 import static com.autosalon.domain.validation.DomainValidator.requireNonNull;
 
-public final class OrderService {
-    private final CrudRepository<User> userRepository;
-    private final CrudRepository<Car> carRepository;
-    private final CrudRepository<InStockCarOrder> inStockOrderRepository;
-    private final CrudRepository<CustomCarOrder> customOrderRepository;
+@Service
+@Transactional
+public class OrderService {
+    private final UserRepository userRepository;
+    private final CarRepository carRepository;
+    private final InStockCarOrderRepository inStockOrderRepository;
+    private final CustomCarOrderRepository customOrderRepository;
 
     public OrderService(
-            CrudRepository<User> userRepository,
-            CrudRepository<Car> carRepository,
-            CrudRepository<InStockCarOrder> inStockOrderRepository,
-            CrudRepository<CustomCarOrder> customOrderRepository
+            UserRepository userRepository,
+            CarRepository carRepository,
+            InStockCarOrderRepository inStockOrderRepository,
+            CustomCarOrderRepository customOrderRepository
     ) {
         this.userRepository = requireNonNull(userRepository, "user repository");
         this.carRepository = requireNonNull(carRepository, "car repository");
@@ -38,7 +45,7 @@ public final class OrderService {
     public InStockCarOrder createInStockOrder(UUID clientId, UUID carId) {
         User client = findUserWithRole(clientId, Role.CLIENT, "client");
         User manager = assignManager();
-        Car car = ServiceSupport.findOrThrow(carRepository, carId, "Car");
+        Car car = ServiceSupport.findActiveOrThrow(carRepository, carId, "Car");
         if (!car.isAvailable()) {
             throw new DomainValidationException("car is not available for purchase");
         }
@@ -54,20 +61,24 @@ public final class OrderService {
         return customOrderRepository.save(CustomCarOrder.create(client, manager, requireNonNull(configuration, "configuration")));
     }
 
+    @Transactional(readOnly = true)
     public InStockCarOrder findInStockOrder(UUID id) {
-        return ServiceSupport.findOrThrow(inStockOrderRepository, id, "InStockCarOrder");
+        return ServiceSupport.findActiveOrThrow(inStockOrderRepository, id, "InStockCarOrder");
     }
 
+    @Transactional(readOnly = true)
     public CustomCarOrder findCustomOrder(UUID id) {
-        return ServiceSupport.findOrThrow(customOrderRepository, id, "CustomCarOrder");
+        return ServiceSupport.findActiveOrThrow(customOrderRepository, id, "CustomCarOrder");
     }
 
+    @Transactional(readOnly = true)
     public List<InStockCarOrder> listInStockOrders() {
-        return inStockOrderRepository.findAll();
+        return inStockOrderRepository.findByRemovedFalse();
     }
 
+    @Transactional(readOnly = true)
     public List<CustomCarOrder> listCustomOrders() {
-        return customOrderRepository.findAll();
+        return customOrderRepository.findByRemovedFalse();
     }
 
     public InStockCarOrder updateInStockOrderStatus(UUID orderId, InStockOrderStatus status) {
@@ -83,12 +94,12 @@ public final class OrderService {
     }
 
     private User findUserWithRole(UUID userId, Role role, String fieldName) {
-        User user = ServiceSupport.findOrThrow(userRepository, userId, "User");
+        User user = ServiceSupport.findActiveOrThrow(userRepository, userId, "User");
         return ServiceSupport.requireRole(user, role, fieldName);
     }
 
     private User assignManager() {
-        return userRepository.findAll().stream()
+        return userRepository.findByRoleAndRemovedFalse(Role.DEALERSHIP_MANAGER).stream()
                 .filter(user -> user.getRole() == Role.DEALERSHIP_MANAGER)
                 .min(Comparator.comparing(user -> user.getId().toString()))
                 .orElseThrow(() -> new DomainValidationException("no dealership manager registered"));

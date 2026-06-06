@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: autosalon-backend-lab2
+  datasource:
+    url: jdbc:postgresql://localhost:5435/autosalon
+    username: autosalon
+    password: autosalon
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.sql
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+server:
+  port: 8080

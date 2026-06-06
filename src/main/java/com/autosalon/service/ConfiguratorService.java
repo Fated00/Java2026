@@ -7,10 +7,16 @@ import com.autosalon.domain.exception.IncompatibleComponentException;
 import com.autosalon.domain.model.CarModel;
 import com.autosalon.domain.model.ComponentOption;
 import com.autosalon.domain.model.Configuration;
-import com.autosalon.repository.CrudRepository;
+import com.autosalon.repository.CarModelRepository;
+import com.autosalon.repository.ComponentOptionRepository;
+import com.autosalon.repository.specification.CarModelSpecifications;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,13 +24,15 @@ import java.util.UUID;
 
 import static com.autosalon.domain.validation.DomainValidator.requireNonNull;
 
-public final class ConfiguratorService {
-    private final CrudRepository<CarModel> modelRepository;
-    private final CrudRepository<ComponentOption> componentOptionRepository;
+@Service
+@Transactional
+public class ConfiguratorService {
+    private final CarModelRepository modelRepository;
+    private final ComponentOptionRepository componentOptionRepository;
 
     public ConfiguratorService(
-            CrudRepository<CarModel> modelRepository,
-            CrudRepository<ComponentOption> componentOptionRepository
+            CarModelRepository modelRepository,
+            ComponentOptionRepository componentOptionRepository
     ) {
         this.modelRepository = requireNonNull(modelRepository, "model repository");
         this.componentOptionRepository = requireNonNull(componentOptionRepository, "component option repository");
@@ -36,8 +44,8 @@ public final class ConfiguratorService {
             BigDecimal priceDelta,
             Set<UUID> compatibleModelIds
     ) {
-        ensureModelsExist(compatibleModelIds);
-        ComponentOption option = ComponentOption.create(type, name, priceDelta, compatibleModelIds);
+        Set<CarModel> compatibleModels = findModels(compatibleModelIds);
+        ComponentOption option = ComponentOption.create(type, name, priceDelta, compatibleModels);
         return componentOptionRepository.save(option);
     }
 
@@ -45,15 +53,17 @@ public final class ConfiguratorService {
         CarModel model = findModel(modelId);
         ComponentOption option = findOption(componentOptionId);
         ensureOptionFits(model, type, option);
-        model.assignBaseComponent(type, componentOptionId);
+        model.assignBaseComponent(type, option);
         return modelRepository.save(model);
     }
 
+    @Transactional(readOnly = true)
     public Configuration buildBaseConfiguration(UUID modelId) {
         CarModel model = findModel(modelId);
         return buildConfiguration(modelId, model.getBaseComponentOptionIds());
     }
 
+    @Transactional(readOnly = true)
     public Configuration buildConfiguration(UUID modelId, Map<ComponentType, UUID> selectedOptionIds) {
         CarModel model = findModel(modelId);
         Map<ComponentType, UUID> selectedIds = requireNonNull(selectedOptionIds, "selected option ids");
@@ -72,12 +82,30 @@ public final class ConfiguratorService {
         return new Configuration(model, selectedComponents, totalPrice);
     }
 
+    @Transactional(readOnly = true)
     public List<ComponentOption> listOptionsForModel(UUID modelId, ComponentType type) {
         CarModel model = findModel(modelId);
         requireNonNull(type, "component type");
-        return componentOptionRepository.findAll().stream()
+        return componentOptionRepository.findByTypeAndRemovedFalse(type).stream()
                 .filter(option -> option.getType() == type)
                 .filter(option -> option.isCompatibleWith(model))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Configuration> listBaseConfigurations(
+            String brand,
+            Set<ComponentType> componentTypes,
+            Set<UUID> componentOptionIds
+    ) {
+        Specification<CarModel> specification = Specification
+                .where(CarModelSpecifications.notRemoved())
+                .and(CarModelSpecifications.brandEquals(brand))
+                .and(CarModelSpecifications.hasBaseComponentTypes(componentTypes))
+                .and(CarModelSpecifications.hasBaseComponentOptionIds(componentOptionIds));
+
+        return modelRepository.findAll(specification).stream()
+                .map(model -> buildConfiguration(model.getId(), model.getBaseComponentOptionIds()))
                 .toList();
     }
 
@@ -115,19 +143,20 @@ public final class ConfiguratorService {
     }
 
     private CarModel findModel(UUID modelId) {
-        return ServiceSupport.findOrThrow(modelRepository, modelId, "CarModel");
+        return ServiceSupport.findActiveOrThrow(modelRepository, modelId, "CarModel");
     }
 
     private ComponentOption findOption(UUID optionId) {
-        return ServiceSupport.findOrThrow(componentOptionRepository, optionId, "ComponentOption");
+        return ServiceSupport.findActiveOrThrow(componentOptionRepository, optionId, "ComponentOption");
     }
 
-    private void ensureModelsExist(Set<UUID> modelIds) {
-        requireNonNull(modelIds, "model ids").stream()
-                .filter(modelId -> !modelRepository.existsById(modelId))
-                .findFirst()
-                .ifPresent(modelId -> {
-                    throw new EntityNotFoundException("CarModel", modelId);
-                });
+    private Set<CarModel> findModels(Set<UUID> modelIds) {
+        Set<CarModel> models = new HashSet<>();
+        requireNonNull(modelIds, "model ids").forEach(modelId -> {
+            CarModel model = modelRepository.findByIdAndRemovedFalse(modelId)
+                    .orElseThrow(() -> new EntityNotFoundException("CarModel", modelId));
+            models.add(model);
+        });
+        return models;
     }
 }

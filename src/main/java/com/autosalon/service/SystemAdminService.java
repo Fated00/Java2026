@@ -1,33 +1,42 @@
 package com.autosalon.service;
 
-import com.autosalon.domain.Identifiable;
-import com.autosalon.repository.CrudRepository;
+import com.autosalon.domain.model.BaseEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
 import static com.autosalon.domain.validation.DomainValidator.requireNonNull;
 
-public final class SystemAdminService {
-    public <T extends Identifiable> T create(CrudRepository<T> repository, T entity) {
+@Service
+@Transactional
+public class SystemAdminService {
+    public <T extends BaseEntity> T create(JpaRepository<T, UUID> repository, T entity) {
         return requireNonNull(repository, "repository").save(requireNonNull(entity, "entity"));
     }
 
-    public <T extends Identifiable> T update(CrudRepository<T> repository, T entity) {
+    public <T extends BaseEntity> T update(JpaRepository<T, UUID> repository, T entity) {
         return requireNonNull(repository, "repository").save(requireNonNull(entity, "entity"));
     }
 
-    public <T extends Identifiable> T view(CrudRepository<T> repository, UUID id, String entityName) {
-        return ServiceSupport.findOrThrow(requireNonNull(repository, "repository"), id, entityName);
+    @Transactional(readOnly = true)
+    public <T extends BaseEntity> T view(JpaRepository<T, UUID> repository, UUID id, String entityName) {
+        return ServiceSupport.findActiveOrThrow(requireNonNull(repository, "repository"), id, entityName);
     }
 
-    public <T extends Identifiable> List<T> list(CrudRepository<T> repository) {
-        return requireNonNull(repository, "repository").findAll();
+    @Transactional(readOnly = true)
+    public <T extends BaseEntity> List<T> list(JpaRepository<T, UUID> repository) {
+        return requireNonNull(repository, "repository").findAll().stream()
+                .filter(entity -> !entity.isRemoved())
+                .toList();
     }
 
-    public <T extends Identifiable> void delete(CrudRepository<T> repository, UUID id) {
-        CrudRepository<T> checkedRepository = requireNonNull(repository, "repository");
-        ServiceSupport.findOrThrow(checkedRepository, id, "Entity");
-        checkedRepository.deleteById(id);
+    public <T extends BaseEntity> void delete(JpaRepository<T, UUID> repository, UUID id) {
+        JpaRepository<T, UUID> checkedRepository = requireNonNull(repository, "repository");
+        T entity = ServiceSupport.findActiveOrThrow(checkedRepository, id, "Entity");
+        entity.markRemoved();
+        checkedRepository.save(entity);
     }
 }

@@ -5,7 +5,12 @@ import com.autosalon.domain.exception.DomainValidationException;
 import com.autosalon.domain.model.Car;
 import com.autosalon.domain.model.TestDriveRequest;
 import com.autosalon.domain.model.User;
-import com.autosalon.repository.CrudRepository;
+import com.autosalon.repository.CarRepository;
+import com.autosalon.repository.TestDriveRequestRepository;
+import com.autosalon.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -14,24 +19,19 @@ import java.util.UUID;
 
 import static com.autosalon.domain.validation.DomainValidator.requireNonNull;
 
-public final class TestDriveService {
-    private final CrudRepository<User> userRepository;
-    private final CrudRepository<Car> carRepository;
-    private final CrudRepository<TestDriveRequest> requestRepository;
+@Service
+@Transactional
+public class TestDriveService {
+    private final UserRepository userRepository;
+    private final CarRepository carRepository;
+    private final TestDriveRequestRepository requestRepository;
     private final Clock clock;
 
+    @Autowired
     public TestDriveService(
-            CrudRepository<User> userRepository,
-            CrudRepository<Car> carRepository,
-            CrudRepository<TestDriveRequest> requestRepository
-    ) {
-        this(userRepository, carRepository, requestRepository, Clock.systemDefaultZone());
-    }
-
-    public TestDriveService(
-            CrudRepository<User> userRepository,
-            CrudRepository<Car> carRepository,
-            CrudRepository<TestDriveRequest> requestRepository,
+            UserRepository userRepository,
+            CarRepository carRepository,
+            TestDriveRequestRepository requestRepository,
             Clock clock
     ) {
         this.userRepository = requireNonNull(userRepository, "user repository");
@@ -41,24 +41,24 @@ public final class TestDriveService {
     }
 
     public Car addCarToTestDriveList(UUID carId) {
-        Car car = ServiceSupport.findOrThrow(carRepository, carId, "Car");
+        Car car = ServiceSupport.findActiveOrThrow(carRepository, carId, "Car");
         car.setTestDriveAvailable(true);
         return carRepository.save(car);
     }
 
     public Car removeCarFromTestDriveList(UUID carId) {
-        Car car = ServiceSupport.findOrThrow(carRepository, carId, "Car");
+        Car car = ServiceSupport.findActiveOrThrow(carRepository, carId, "Car");
         car.setTestDriveAvailable(false);
         return carRepository.save(car);
     }
 
     public TestDriveRequest requestTestDrive(UUID clientId, UUID carId, LocalDateTime startsAt) {
         User client = ServiceSupport.requireRole(
-                ServiceSupport.findOrThrow(userRepository, clientId, "User"),
+                ServiceSupport.findActiveOrThrow(userRepository, clientId, "User"),
                 Role.CLIENT,
                 "client"
         );
-        Car car = ServiceSupport.findOrThrow(carRepository, carId, "Car");
+        Car car = ServiceSupport.findActiveOrThrow(carRepository, carId, "Car");
         LocalDateTime startTime = requireNonNull(startsAt, "test-drive start time");
 
         if (!car.isTestDriveAvailable()) {
@@ -74,16 +74,17 @@ public final class TestDriveService {
         return requestRepository.save(TestDriveRequest.create(client, car, startTime));
     }
 
+    @Transactional(readOnly = true)
     public TestDriveRequest findRequest(UUID id) {
-        return ServiceSupport.findOrThrow(requestRepository, id, "TestDriveRequest");
+        return ServiceSupport.findActiveOrThrow(requestRepository, id, "TestDriveRequest");
     }
 
+    @Transactional(readOnly = true)
     public List<TestDriveRequest> listRequests() {
-        return requestRepository.findAll();
+        return requestRepository.findByRemovedFalse();
     }
 
     private boolean isSlotAlreadyBooked(UUID carId, LocalDateTime startsAt) {
-        return requestRepository.findAll().stream()
-                .anyMatch(request -> request.getCar().getId().equals(carId) && request.getStartsAt().equals(startsAt));
+        return requestRepository.existsByCarIdAndStartsAtAndRemovedFalse(carId, startsAt);
     }
 }

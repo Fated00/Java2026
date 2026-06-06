@@ -10,10 +10,15 @@ import com.autosalon.domain.exception.EntityNotFoundException;
 import com.autosalon.domain.model.Car;
 import com.autosalon.domain.model.CarModel;
 import com.autosalon.domain.model.Part;
-import com.autosalon.repository.CrudRepository;
+import com.autosalon.repository.CarModelRepository;
+import com.autosalon.repository.CarRepository;
+import com.autosalon.repository.PartRepository;
 import com.autosalon.service.filter.CarFilter;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -21,15 +26,17 @@ import java.util.function.Predicate;
 
 import static com.autosalon.domain.validation.DomainValidator.requireNonNull;
 
-public final class CarCatalogService {
-    private final CrudRepository<CarModel> modelRepository;
-    private final CrudRepository<Car> carRepository;
-    private final CrudRepository<Part> partRepository;
+@Service
+@Transactional
+public class CarCatalogService {
+    private final CarModelRepository modelRepository;
+    private final CarRepository carRepository;
+    private final PartRepository partRepository;
 
     public CarCatalogService(
-            CrudRepository<CarModel> modelRepository,
-            CrudRepository<Car> carRepository,
-            CrudRepository<Part> partRepository
+            CarModelRepository modelRepository,
+            CarRepository carRepository,
+            PartRepository partRepository
     ) {
         this.modelRepository = requireNonNull(modelRepository, "model repository");
         this.carRepository = requireNonNull(carRepository, "car repository");
@@ -63,12 +70,14 @@ public final class CarCatalogService {
         return modelRepository.save(model);
     }
 
+    @Transactional(readOnly = true)
     public CarModel findModel(UUID id) {
-        return ServiceSupport.findOrThrow(modelRepository, id, "CarModel");
+        return ServiceSupport.findActiveOrThrow(modelRepository, id, "CarModel");
     }
 
+    @Transactional(readOnly = true)
     public List<CarModel> listModels() {
-        return modelRepository.findAll();
+        return modelRepository.findByRemovedFalse();
     }
 
     public Car addCar(UUID modelId, String color, BigDecimal price) {
@@ -76,19 +85,21 @@ public final class CarCatalogService {
         return carRepository.save(Car.create(model, color, price));
     }
 
+    @Transactional(readOnly = true)
     public Car findCar(UUID id) {
-        return ServiceSupport.findOrThrow(carRepository, id, "Car");
+        return ServiceSupport.findActiveOrThrow(carRepository, id, "Car");
     }
 
+    @Transactional(readOnly = true)
     public List<Car> listCars() {
-        return carRepository.findAll();
+        return carRepository.findByRemovedFalse();
     }
 
+    @Transactional(readOnly = true)
     public List<Car> listAvailableCars(CarFilter filter) {
         CarFilter carFilter = requireNonNull(filter, "car filter");
         validateFilter(carFilter);
-        return carRepository.findAll().stream()
-                .filter(Car::isAvailable)
+        return carRepository.findByAvailableTrueAndRemovedFalse().stream()
                 .filter(matches(carFilter))
                 .toList();
     }
@@ -108,23 +119,24 @@ public final class CarCatalogService {
     }
 
     public void deleteCar(UUID id) {
-        if (!carRepository.existsById(id)) {
-            findCar(id);
-        }
-        carRepository.deleteById(id);
+        Car car = findCar(id);
+        car.markRemoved();
+        carRepository.save(car);
     }
 
     public Part addPart(String sku, String name, BigDecimal price, Set<UUID> compatibleModelIds) {
-        ensureModelsExist(compatibleModelIds);
-        return partRepository.save(Part.create(sku, name, price, compatibleModelIds));
+        Set<CarModel> compatibleModels = findModels(compatibleModelIds);
+        return partRepository.save(Part.create(sku, name, price, compatibleModels));
     }
 
+    @Transactional(readOnly = true)
     public Part findPart(UUID id) {
-        return ServiceSupport.findOrThrow(partRepository, id, "Part");
+        return ServiceSupport.findActiveOrThrow(partRepository, id, "Part");
     }
 
+    @Transactional(readOnly = true)
     public List<Part> listParts() {
-        return partRepository.findAll();
+        return partRepository.findByRemovedFalse();
     }
 
     public Part updatePart(UUID id, String name, BigDecimal price, Set<UUID> compatibleModelIds) {
@@ -136,8 +148,7 @@ public final class CarCatalogService {
             part.setPrice(price);
         }
         if (compatibleModelIds != null) {
-            ensureModelsExist(compatibleModelIds);
-            part.setCompatibleModelIds(compatibleModelIds);
+            part.setCompatibleModels(findModels(compatibleModelIds));
         }
         return partRepository.save(part);
     }
@@ -185,12 +196,13 @@ public final class CarCatalogService {
         return (min == null || actual.compareTo(min) >= 0) && (max == null || actual.compareTo(max) <= 0);
     }
 
-    private void ensureModelsExist(Set<UUID> modelIds) {
-        requireNonNull(modelIds, "model ids").stream()
-                .filter(modelId -> !modelRepository.existsById(modelId))
-                .findFirst()
-                .ifPresent(modelId -> {
-                    throw new EntityNotFoundException("CarModel", modelId);
-                });
+    private Set<CarModel> findModels(Set<UUID> modelIds) {
+        Set<CarModel> models = new HashSet<>();
+        requireNonNull(modelIds, "model ids").forEach(modelId -> {
+            CarModel model = modelRepository.findByIdAndRemovedFalse(modelId)
+                    .orElseThrow(() -> new EntityNotFoundException("CarModel", modelId));
+            models.add(model);
+        });
+        return models;
     }
 }

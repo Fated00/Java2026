@@ -1,30 +1,78 @@
 package com.autosalon.domain.model;
 
-import com.autosalon.domain.Identifiable;
+import com.autosalon.domain.enums.ComponentType;
 import com.autosalon.domain.enums.CustomOrderStatus;
 import com.autosalon.domain.enums.Role;
 import com.autosalon.domain.exception.DomainValidationException;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.MapKeyEnumerated;
+import jakarta.persistence.Table;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.autosalon.domain.validation.DomainValidator.requireId;
 import static com.autosalon.domain.validation.DomainValidator.requireNonNull;
 
-public final class CustomCarOrder implements Identifiable {
-    private final UUID id;
-    private final User client;
-    private final User manager;
-    private final Configuration configuration;
-    private final LocalDateTime createdAt;
+@Entity
+@Table(name = "custom_car_orders")
+public class CustomCarOrder extends BaseEntity {
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "client_id", nullable = false)
+    private User client;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "manager_id", nullable = false)
+    private User manager;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "model_id", nullable = false)
+    private CarModel model;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "custom_order_components",
+            joinColumns = @JoinColumn(name = "custom_order_id"),
+            inverseJoinColumns = @JoinColumn(name = "component_option_id")
+    )
+    @MapKeyColumn(name = "component_type", nullable = false)
+    @MapKeyEnumerated(EnumType.STRING)
+    private Map<ComponentType, ComponentOption> selectedComponents = new EnumMap<>(ComponentType.class);
+
+    @Column(nullable = false, precision = 14, scale = 2)
+    private BigDecimal totalPrice;
+
+    @Column(nullable = false)
+    private LocalDateTime orderedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private CustomOrderStatus status;
 
+    protected CustomCarOrder() {
+    }
+
     public CustomCarOrder(UUID id, User client, User manager, Configuration configuration) {
-        this.id = requireId(id, "custom order id");
+        super(requireId(id, "custom order id"));
         this.client = requireUserRole(client, Role.CLIENT, "client");
         this.manager = requireUserRole(manager, Role.DEALERSHIP_MANAGER, "manager");
-        this.configuration = requireNonNull(configuration, "configuration");
-        this.createdAt = LocalDateTime.now();
+        Configuration checkedConfiguration = requireNonNull(configuration, "configuration");
+        this.model = checkedConfiguration.getModel();
+        this.selectedComponents = new EnumMap<>(checkedConfiguration.getSelectedComponents());
+        this.totalPrice = checkedConfiguration.getTotalPrice();
+        this.orderedAt = LocalDateTime.now();
         this.status = CustomOrderStatus.CREATED;
     }
 
@@ -40,11 +88,6 @@ public final class CustomCarOrder implements Identifiable {
         return user;
     }
 
-    @Override
-    public UUID getId() {
-        return id;
-    }
-
     public User getClient() {
         return client;
     }
@@ -54,11 +97,23 @@ public final class CustomCarOrder implements Identifiable {
     }
 
     public Configuration getConfiguration() {
-        return configuration;
+        return new Configuration(model, selectedComponents, totalPrice);
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    public CarModel getModel() {
+        return model;
+    }
+
+    public Map<ComponentType, ComponentOption> getSelectedComponents() {
+        return Map.copyOf(selectedComponents);
+    }
+
+    public BigDecimal getTotalPrice() {
+        return totalPrice;
+    }
+
+    public LocalDateTime getOrderedAt() {
+        return orderedAt;
     }
 
     public CustomOrderStatus getStatus() {

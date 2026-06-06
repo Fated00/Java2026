@@ -1,10 +1,16 @@
-.PHONY: run test docker-build docker-run docker-up docker-clean
+.PHONY: run test db-up db-down docker-build docker-run docker-up docker-clean
 
 run:
-	./gradlew run
+	./gradlew bootRun
 
 test:
 	./gradlew clean test check
+
+db-up:
+	docker compose up -d postgres
+
+db-down:
+	docker compose down
 
 docker-build:
 	docker compose build
