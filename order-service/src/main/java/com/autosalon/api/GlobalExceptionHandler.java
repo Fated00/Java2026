@@ -4,6 +4,7 @@ import com.autosalon.api.dto.Dtos.ApiError;
 import com.autosalon.domain.exception.DomainValidationException;
 import com.autosalon.domain.exception.EntityNotFoundException;
 import com.autosalon.domain.exception.IncompatibleComponentException;
+import com.autosalon.service.StorageServiceUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -49,6 +50,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiError handleAccessDenied(AccessDeniedException exception) {
         return new ApiError("ACCESS_DENIED", exception.getMessage(), Instant.now());
+    }
+
+    @ExceptionHandler(StorageServiceUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiError handleStorageUnavailable(StorageServiceUnavailableException exception) {
+        return new ApiError("STORAGE_SERVICE_UNAVAILABLE", exception.getMessage(), Instant.now());
     }
 
     private String formatFieldError(FieldError error) {

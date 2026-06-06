@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package autosalon.inventory;
+
+option java_multiple_files = true;
+option java_package = "com.autosalon.grpc.inventory";
+option java_outer_classname = "CarInventoryProto";
+
+service CarInventoryService {
+  rpc ListAvailableCars(ListAvailableCarsRequest) returns (AvailableCarsResponse);
+  rpc GetAvailableCar(GetAvailableCarRequest) returns (AvailableCarResponse);
+}
+
+message ListAvailableCarsRequest {
+}
+
+message GetAvailableCarRequest {
+  string id = 1;
+}
+
+message AvailableCar {
+  string id = 1;
+  string model_id = 2;
+  string model_name = 3;
+  string color = 4;
+  string price = 5;
+  bool available = 6;
+  bool test_drive_available = 7;
+}
+
+message AvailableCarsResponse {
+  repeated AvailableCar cars = 1;
+}
+
+message AvailableCarResponse {
+  AvailableCar car = 1;
+  bool found = 2;
+}

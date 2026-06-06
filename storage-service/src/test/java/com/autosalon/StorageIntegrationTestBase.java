@@ -32,6 +32,8 @@ abstract class StorageIntegrationTestBase {
         registry.add("spring.rabbitmq.port", RABBIT::getAmqpPort);
         registry.add("spring.rabbitmq.username", RABBIT::getAdminUsername);
         registry.add("spring.rabbitmq.password", RABBIT::getAdminPassword);
+        registry.add("spring.rabbitmq.listener.simple.auto-startup", () -> "false");
         registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri", () -> "http://localhost:65535/jwks");
+        registry.add("autosalon.grpc.server.port", () -> "0");
     }
 }

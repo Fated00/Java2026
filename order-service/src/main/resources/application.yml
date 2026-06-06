@@ -33,3 +33,10 @@ springdoc:
 
 server:
   port: 8080
+
+autosalon:
+  grpc:
+    storage:
+      host: localhost
+      port: 9090
+      timeout-ms: 1000
